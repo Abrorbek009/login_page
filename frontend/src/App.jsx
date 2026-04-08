@@ -212,7 +212,126 @@ export default function App() {
   };
 
   const printDashboard = () => {
-    window.print();
+    const rowsHtml = (rows) =>
+      rows
+        .map(
+          (row) => `
+            <tr>
+              <td>${row.label}</td>
+              <td>${Number(row.sales || 0).toFixed(2)}</td>
+              <td>${Number(row.profit || 0).toFixed(2)}</td>
+            </tr>
+          `,
+        )
+        .join("");
+
+    const printable = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Finance Report</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 24px;
+              color: #111827;
+            }
+            h1, h2, p { margin: 0 0 12px; }
+            .grid {
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 12px;
+              margin: 18px 0 24px;
+            }
+            .card {
+              border: 1px solid #d1d5db;
+              border-radius: 12px;
+              padding: 14px;
+              background: #f9fafb;
+            }
+            .card span {
+              display: block;
+              color: #6b7280;
+              font-size: 12px;
+              margin-bottom: 8px;
+            }
+            .card strong {
+              font-size: 22px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 8px;
+              margin-bottom: 24px;
+            }
+            th, td {
+              border: 1px solid #d1d5db;
+              padding: 8px 10px;
+              text-align: left;
+              font-size: 13px;
+            }
+            th {
+              background: #f3f4f6;
+            }
+            .section {
+              margin-bottom: 24px;
+            }
+            @media print {
+              body { margin: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Finance Report</h1>
+          <p>Generated: ${new Date().toLocaleString()}</p>
+          <div class="grid">
+            <div class="card"><span>Umumiy tushum</span><strong>${stats.revenue.toFixed(2)}</strong></div>
+            <div class="card"><span>Jami xarajatlar</span><strong>${stats.expensesTotal.toFixed(2)}</strong></div>
+            <div class="card"><span>Net foyda</span><strong>${stats.profit.toFixed(2)}</strong></div>
+          </div>
+
+          <div class="section">
+            <h2>Kunlik savdo</h2>
+            <table>
+              <thead>
+                <tr><th>Kun</th><th>Sales</th><th>Profit</th></tr>
+              </thead>
+              <tbody>
+                ${rowsHtml(reportTrend.daily)}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <h2>Oylik savdo</h2>
+            <table>
+              <thead>
+                <tr><th>Oy</th><th>Sales</th><th>Profit</th></tr>
+              </thead>
+              <tbody>
+                ${rowsHtml(reportTrend.monthly)}
+              </tbody>
+            </table>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const win = window.open("", "_blank", "noopener,noreferrer,width=1100,height=900");
+    if (!win) {
+      window.print();
+      return;
+    }
+
+    win.document.open();
+    win.document.write(printable);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+    }, 250);
   };
 
   const handleLogin = async (event) => {
