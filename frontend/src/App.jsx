@@ -319,19 +319,37 @@ export default function App() {
       </html>
     `;
 
-    const win = window.open("", "_blank", "noopener,noreferrer,width=1100,height=900");
-    if (!win) {
-      window.print();
-      return;
-    }
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0";
+    iframe.srcdoc = printable;
 
-    win.document.open();
-    win.document.write(printable);
-    win.document.close();
-    win.focus();
-    setTimeout(() => {
-      win.print();
-    }, 250);
+    const cleanup = () => {
+      setTimeout(() => {
+        iframe.remove();
+      }, 500);
+    };
+
+    iframe.onload = () => {
+      const frameWindow = iframe.contentWindow;
+      if (!frameWindow) {
+        cleanup();
+        return;
+      }
+
+      frameWindow.focus();
+      frameWindow.print();
+      frameWindow.onafterprint = cleanup;
+      setTimeout(cleanup, 3000);
+    };
+
+    document.body.appendChild(iframe);
   };
 
   const handleLogin = async (event) => {
