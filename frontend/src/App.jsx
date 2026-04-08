@@ -6,11 +6,17 @@ const emptyProductForm = { name: "", sku: "", price: "", stock: "" };
 const emptyEmployeeForm = { fullName: "", position: "", salary: "", phone: "", status: "active" };
 const emptyExpenseForm = { title: "", category: "", amount: "", note: "" };
 
-const SECTIONS = [
+const ADMIN_SECTIONS = [
   { id: "overview", label: "Umumiy" },
   { id: "products", label: "Mahsulotlar" },
   { id: "employees", label: "Ishchilar" },
   { id: "expenses", label: "Xarajatlar" },
+  { id: "finance", label: "Hisobot" },
+];
+
+const SALES_SECTIONS = [
+  { id: "overview", label: "Umumiy" },
+  { id: "sales", label: "Sotuv" },
   { id: "finance", label: "Hisobot" },
 ];
 
@@ -93,7 +99,14 @@ export default function App() {
   const [password, setPassword] = useState("0000");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem("dashboard-user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
   const [activeSection, setActiveSection] = useState("overview");
 
   const [products, setProducts] = useState([]);
@@ -112,6 +125,8 @@ export default function App() {
   const [dashboardMessage, setDashboardMessage] = useState("");
   const [busyId, setBusyId] = useState("");
   const [clearingDemo, setClearingDemo] = useState(false);
+  const isAdmin = user?.role === "admin";
+  const sections = isAdmin ? ADMIN_SECTIONS : SALES_SECTIONS;
 
   const loadDashboard = async () => {
     const [productData, employeeData, expenseData] = await Promise.all([
@@ -129,6 +144,24 @@ export default function App() {
   useEffect(() => {
     if (user) loadDashboard().catch((err) => setDashboardError(err.message));
   }, [user]);
+
+  useEffect(() => {
+    try {
+      if (user) {
+        localStorage.setItem("dashboard-user", JSON.stringify(user));
+      } else {
+        localStorage.removeItem("dashboard-user");
+      }
+    } catch {
+      // Ignore storage errors and keep the session in-memory.
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!sections.some((section) => section.id === activeSection) && sections.length > 0) {
+      setActiveSection(sections[0].id);
+    }
+  }, [sections, activeSection]);
 
   const stats = useMemo(() => {
     const productCount = products.length;
@@ -152,6 +185,22 @@ export default function App() {
     return { productCount, totalStock, totalSold, inventoryValue, revenue, salaryFund, salariesPaid, expensesTotal, profit };
   }, [products, employees, expenses]);
 
+  const overviewCards = isAdmin
+    ? [
+        { label: "Mahsulotlar", value: stats.productCount },
+        { label: "Ombordagi son", value: stats.totalStock },
+        { label: "Sotilgan", value: stats.totalSold },
+        { label: "Oylik jamg'arma", value: `$${stats.salaryFund.toFixed(2)}` },
+        { label: "Xarajatlar", value: `$${stats.expensesTotal.toFixed(2)}` },
+        { label: "Foyda", value: `$${stats.profit.toFixed(2)}`, className: stats.profit >= 0 ? "positive" : "negative" },
+      ]
+    : [
+        { label: "Mahsulotlar", value: stats.productCount },
+        { label: "Ombordagi son", value: stats.totalStock },
+        { label: "Sotilgan", value: stats.totalSold },
+        { label: "Umumiy tushum", value: `$${stats.revenue.toFixed(2)}` },
+        { label: "Foyda", value: `$${stats.profit.toFixed(2)}`, className: stats.profit >= 0 ? "positive" : "negative" },
+      ];
   const resetMessages = () => {
     setDashboardError("");
     setDashboardMessage("");
@@ -481,7 +530,7 @@ export default function App() {
   };
 
   const editProduct = (product) => {
-    setActiveSection("products");
+    setActiveSection(isAdmin ? "products" : "sales");
     setEditingEmployeeId(null);
     setEditingExpenseId(null);
     setEditingProductId(product._id);
@@ -520,21 +569,28 @@ export default function App() {
     });
   };
 
+  const handleLogout = () => {
+    setUser(null);
+    cancelEdit();
+    setDashboardError("");
+    setDashboardMessage("");
+    setActiveSection("overview");
+  };
   if (!user) {
     return (
       <main className="shell">
         <section className="hero">
           <div className="hero-copy">
             <p className="eyebrow">Node.js + React</p>
-            <h1>Admin login</h1>
+            <h1>Admin va sotuv login</h1>
             <p className="lead">
-              Backend and frontend are connected. Use <strong>admin</strong> and{" "}
-              <strong>0000</strong> to enter.
+              Backend va frontend ulandi. Kirish uchun <strong>admin</strong> yoki{" "}
+              <strong>sotuv</strong> va parol <strong>0000</strong> ni ishlating.
             </p>
           </div>
           <form className="card login-card" onSubmit={handleLogin}>
             <label>
-              Username
+              Login
               <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
             </label>
             <label>
@@ -551,55 +607,76 @@ export default function App() {
     );
   }
 
-  const renderProducts = () => (
-    <section className="section-layout">
-      <SectionCard title={editingProductId ? "Mahsulotni tahrirlash" : "Mahsulot qo'shish"} subtitle="Omborga yangi mahsulot kiritish">
-        <form className="panel-form" onSubmit={submitProduct}>
-          <label>
-            Nomi
-            <input value={productForm.name} onChange={(e) => setProductForm((c) => ({ ...c, name: e.target.value }))} />
-          </label>
-          <label>
-            SKU
-            <input value={productForm.sku} onChange={(e) => setProductForm((c) => ({ ...c, sku: e.target.value }))} />
-          </label>
-          <div className="two-col">
-            <label>
-              Narx
-              <input type="number" min="0" step="0.01" value={productForm.price} onChange={(e) => setProductForm((c) => ({ ...c, price: e.target.value }))} />
-            </label>
-            <label>
-              Boshlang'ich son
-              <input type="number" min="0" step="1" value={productForm.stock} onChange={(e) => setProductForm((c) => ({ ...c, stock: e.target.value }))} />
-            </label>
-          </div>
-          <div className="form-actions">
-            <button className="primary-button" type="submit">{editingProductId ? "Update product" : "Save product"}</button>
-            {editingProductId ? <button className="secondary-button" type="button" onClick={cancelEdit}>Cancel</button> : null}
-          </div>
-        </form>
-      </SectionCard>
-      <SectionCard title="Mahsulotlar ro'yxati" subtitle="Kirim, sotish, tahrirlash va o'chirish shu yerda">
-        <div className="product-list">
-          {products.length === 0 ? <div className="empty-state"><h3>Hali mahsulot yo'q</h3><p className="muted">Chapdagi forma orqali birinchi mahsulotni qo'shing.</p></div> : products.map((product) => (
-            <article className="product-row" key={product._id}>
-              <div className="product-main">
-                <h3>{product.name}</h3>
-                <p>SKU: {product.sku}</p>
-                <p>Narx: ${Number(product.price).toFixed(2)} Â· Stock: {product.stock} Â· Sold: {product.sold}</p>
+  const renderProducts = (mode = "admin") => {
+    const salesOnly = mode === "sales";
+
+    return (
+      <section className="section-layout">
+        {!salesOnly ? (
+          <SectionCard title={editingProductId ? "Mahsulotni tahrirlash" : "Mahsulot qo'shish"} subtitle="Omborga yangi mahsulot kiritish">
+            <form className="panel-form" onSubmit={submitProduct}>
+              <label>
+                Nomi
+                <input value={productForm.name} onChange={(e) => setProductForm((c) => ({ ...c, name: e.target.value }))} />
+              </label>
+              <label>
+                SKU
+                <input value={productForm.sku} onChange={(e) => setProductForm((c) => ({ ...c, sku: e.target.value }))} />
+              </label>
+              <div className="two-col">
+                <label>
+                  Narx
+                  <input type="number" min="0" step="0.01" value={productForm.price} onChange={(e) => setProductForm((c) => ({ ...c, price: e.target.value }))} />
+                </label>
+                <label>
+                  Boshlang'ich son
+                  <input type="number" min="0" step="1" value={productForm.stock} onChange={(e) => setProductForm((c) => ({ ...c, stock: e.target.value }))} />
+                </label>
               </div>
-              <div className="product-actions">
-                <button className="ghost-button" type="button" onClick={() => editProduct(product)}>Edit</button>
-                <button className="ghost-button" type="button" disabled={busyId === product._id} onClick={() => updateProduct(product._id, "purchase")}>Buy in</button>
-                <button className="ghost-button" type="button" disabled={busyId === product._id} onClick={() => updateProduct(product._id, "sell")}>Sell</button>
-                <button className="danger-button" type="button" disabled={busyId === product._id} onClick={() => deleteById("/api/products", product._id, "Mahsulot o'chirildi")}>Delete</button>
+              <div className="form-actions">
+                <button className="primary-button" type="submit">{editingProductId ? "Update product" : "Save product"}</button>
+                {editingProductId ? <button className="secondary-button" type="button" onClick={cancelEdit}>Cancel</button> : null}
               </div>
-            </article>
-          ))}
-        </div>
-      </SectionCard>
-    </section>
-  );
+            </form>
+          </SectionCard>
+        ) : null}
+        <SectionCard title={salesOnly ? "Sotuv uchun mahsulotlar" : "Mahsulotlar ro'yxati"} subtitle={salesOnly ? "Chapdagi menyudan mahsulot tanlab sotuv qiling" : "Kirim, sotish, tahrirlash va o'chirish shu yerda"}>
+          <div className="product-list">
+            {products.length === 0 ? (
+              <div className="empty-state">
+                <h3>Hali mahsulot yo'q</h3>
+                <p className="muted">{salesOnly ? "Admin mahsulot qo'shgandan keyin shu yerda chiqadi." : "Chapdagi forma orqali birinchi mahsulotni qo'shing."}</p>
+              </div>
+            ) : (
+              products.map((product) => (
+                <article className="product-row" key={product._id}>
+                  <div className="product-main">
+                    <h3>{product.name}</h3>
+                    <p>SKU: {product.sku}</p>
+                    <p>Narx: ${Number(product.price).toFixed(2)} · Stock: {product.stock} · Sold: {product.sold}</p>
+                  </div>
+                  <div className="product-actions">
+                    {!salesOnly ? (
+                      <button className="ghost-button" type="button" onClick={() => editProduct(product)}>Edit</button>
+                    ) : null}
+                    {!salesOnly ? (
+                      <button className="ghost-button" type="button" disabled={busyId === product._id} onClick={() => updateProduct(product._id, "purchase")}>Buy in</button>
+                    ) : null}
+                    <button className="ghost-button" type="button" disabled={busyId === product._id} onClick={() => updateProduct(product._id, "sell")}>Sell</button>
+                    {!salesOnly ? (
+                      <button className="danger-button" type="button" disabled={busyId === product._id} onClick={() => deleteById("/api/products", product._id, "Mahsulot o'chirildi")}>Delete</button>
+                    ) : null}
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        </SectionCard>
+      </section>
+    );
+  };
+
+  const renderSales = () => renderProducts("sales");
 
   const renderEmployees = () => (
     <section className="section-layout">
@@ -711,7 +788,7 @@ export default function App() {
           <h2>Bo'limlar</h2>
         </div>
         <nav className="sidebar-nav">
-          {SECTIONS.map((section) => (
+          {sections.map((section) => (
             <button
               key={section.id}
               type="button"
@@ -724,15 +801,15 @@ export default function App() {
         </nav>
         <div className="sidebar-footer">
           <button className="secondary-button full-width" type="button" onClick={() => loadDashboard().catch((err) => setDashboardError(err.message))}>Refresh all</button>
-          <button className="secondary-button full-width" type="button" onClick={clearDemoData} disabled={clearingDemo}>{clearingDemo ? "Clearing..." : "Clear demo data"}</button>
-          <button className="secondary-button full-width" type="button" onClick={() => setUser(null)}>Log out</button>
+          {isAdmin ? <button className="secondary-button full-width" type="button" onClick={clearDemoData} disabled={clearingDemo}>{clearingDemo ? "Clearing..." : "Clear demo data"}</button> : null}
+          <button className="secondary-button full-width" type="button" onClick={handleLogout}>Log out</button>
         </div>
       </aside>
       <main className="dashboard-main">
         <header className="dashboard-top card">
           <div>
             <p className="eyebrow">Active section</p>
-            <h1>{SECTIONS.find((item) => item.id === activeSection)?.label}</h1>
+            <h1>{sections.find((item) => item.id === activeSection)?.label}</h1>
             <p className="lead">Chapdagi menyudan bo'lim tanlang. O'ng tomonda faqat o'sha bo'lim chiqadi.</p>
           </div>
           <div className="header-actions">
@@ -752,17 +829,18 @@ export default function App() {
         )}
         {activeSection === "overview" && (
           <section className="overview-grid">
-            <article className="stat-card"><span>Mahsulotlar</span><strong>{stats.productCount}</strong></article>
-            <article className="stat-card"><span>Ombordagi son</span><strong>{stats.totalStock}</strong></article>
-            <article className="stat-card"><span>Sotilgan</span><strong>{stats.totalSold}</strong></article>
-            <article className="stat-card"><span>Oylik jamg'arma</span><strong>${stats.salaryFund.toFixed(2)}</strong></article>
-            <article className="stat-card"><span>Xarajatlar</span><strong>${stats.expensesTotal.toFixed(2)}</strong></article>
-            <article className="stat-card"><span>Foyda</span><strong className={stats.profit >= 0 ? "positive" : "negative"}>${stats.profit.toFixed(2)}</strong></article>
+            {overviewCards.map((card) => (
+              <article className="stat-card" key={card.label}>
+                <span>{card.label}</span>
+                <strong className={card.className || ""}>{card.value}</strong>
+              </article>
+            ))}
           </section>
         )}
-        {activeSection === "products" ? renderProducts() : null}
-        {activeSection === "employees" ? renderEmployees() : null}
-        {activeSection === "expenses" ? renderExpenses() : null}
+        {activeSection === "products" && isAdmin ? renderProducts() : null}
+        {activeSection === "sales" ? renderSales() : null}
+        {activeSection === "employees" && isAdmin ? renderEmployees() : null}
+        {activeSection === "expenses" && isAdmin ? renderExpenses() : null}
         {activeSection === "finance" && (
           <section className="finance-stack">
             <section className="overview-grid finance-grid">

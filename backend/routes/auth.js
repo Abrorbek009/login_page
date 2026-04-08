@@ -2,18 +2,30 @@ const express = require("express");
 
 const router = express.Router();
 
-const ADMIN_USER = "admin";
-const ADMIN_PASSWORD = "0000";
+const USERS = {
+  admin: {
+    username: "admin",
+    role: "admin",
+    password: "0000",
+  },
+  sotuv: {
+    username: "sotuv",
+    role: "sotuv",
+    password: "0000",
+  },
+};
 
 router.post("/login", (req, res) => {
   const { username, password } = req.body || {};
+  const normalizedUsername = String(username || "").trim().toLowerCase();
+  const user = USERS[normalizedUsername];
 
-  if (username === ADMIN_USER && password === ADMIN_PASSWORD) {
+  if (user && String(password || "") === user.password) {
     return res.json({
       success: true,
       user: {
-        username: ADMIN_USER,
-        role: "admin",
+        username: user.username,
+        role: user.role,
       },
     });
   }
