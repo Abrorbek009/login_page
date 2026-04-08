@@ -1,0 +1,86 @@
+{
+  "info": {
+    "_postman_id": "bekend-collection-001",
+    "name": "Bekend API Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Collection for testing Bekend backend endpoints (import into Postman)."
+  },
+  "item": [
+    {
+      "name": "GET / (root)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": [""]
+        },
+        "description": "Checks server is running."
+      },
+      "response": []
+    },
+    {
+      "name": "POST /api/ping",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ping\": \"pong\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/ping",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "ping"]
+        },
+        "description": "Echo endpoint that returns { message: 'pong', data: <body> }."
+      },
+      "response": []
+    },
+    {
+      "name": "GET /api/attendance",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/attendance",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "attendance"]
+        },
+        "description": "Returns the in-memory attendance list (demo data)."
+      },
+      "response": []
+    },
+    {
+      "name": "POST /api/users",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Bekzod\",\n  \"surname\": \"Abdulhamidov\",\n  \"phone\": \"+998901234567\",\n  \"birthdate\": \"1990-01-01\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/users",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "users"]
+        },
+        "description": "Creates a user in-memory. Required fields: name, phone. Returns created user object."
+      },
+      "response": []
+    }
+  ]
+}
