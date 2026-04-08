@@ -1,5 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const { Transaction } = require("./reports");
 
 const router = express.Router();
 
@@ -35,6 +36,12 @@ router.post("/", async (req, res) => {
       amount: Number(req.body?.amount || 0),
       note: req.body?.note || "",
       source: req.body?.source || "manual",
+    });
+    await Transaction.create({
+      type: "expense",
+      amount: Number(expense.amount || 0),
+      note: expense.title,
+      sourceId: expense._id.toString(),
     });
 
     res.status(201).json(expense);

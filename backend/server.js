@@ -11,6 +11,7 @@ const authRoutes = require('./routes/auth');
 const productsRoutes = require('./routes/products');
 const employeesRoutes = require('./routes/employees');
 const expensesRoutes = require('./routes/expenses');
+const reportsRoutes = require('./routes/reports');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -38,6 +39,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/employees', employeesRoutes);
 app.use('/api/expenses', expensesRoutes);
+app.use('/api/reports', reportsRoutes.router);
 
 // Test route
 app.get('/', (req, res) => {

@@ -1,5 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const { Transaction } = require("./reports");
 
 const router = express.Router();
 
@@ -81,6 +82,12 @@ router.patch("/:id/pay", async (req, res) => {
     employee.lastPaidAt = new Date();
     employee.totalPaid += paidAmount;
     await employee.save();
+    await Transaction.create({
+      type: "salary",
+      amount: paidAmount,
+      note: `${employee.fullName} salary`,
+      sourceId: employee._id.toString(),
+    });
 
     res.json(employee);
   } catch (error) {

@@ -1,5 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const { Transaction } = require("./reports");
 
 const router = express.Router();
 
@@ -84,6 +85,12 @@ router.patch("/:id/purchase", async (req, res) => {
     product.stock += amount;
     product.purchased += amount;
     await product.save();
+    await Transaction.create({
+      type: "purchase",
+      amount: Number(product.price || 0) * amount,
+      note: `${product.name} purchase`,
+      sourceId: product._id.toString(),
+    });
 
     res.json(product);
   } catch (error) {
@@ -107,6 +114,12 @@ router.patch("/:id/sell", async (req, res) => {
     product.stock -= amount;
     product.sold += amount;
     await product.save();
+    await Transaction.create({
+      type: "sale",
+      amount: Number(product.price || 0) * amount,
+      note: `${product.name} sale`,
+      sourceId: product._id.toString(),
+    });
 
     res.json(product);
   } catch (error) {

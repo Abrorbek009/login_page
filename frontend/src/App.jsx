@@ -14,22 +14,17 @@ const SECTIONS = [
   { id: "finance", label: "Hisobot" },
 ];
 
-function formatDayKey(date) {
-  return new Date(date).toISOString().slice(0, 10);
-}
+function buildLinePoints(values) {
+  const max = Math.max(...values.map((value) => Math.abs(value)), 1);
+  const step = values.length > 1 ? 100 / (values.length - 1) : 0;
 
-function formatMonthKey(date) {
-  return new Date(date).toISOString().slice(0, 7);
-}
-
-function buildSeries(labels, values) {
-  const max = Math.max(...values, 1);
-
-  return labels.map((label, index) => ({
-    label,
-    value: values[index] || 0,
-    width: `${Math.max(6, Math.round(((values[index] || 0) / max) * 100))}%`,
-  }));
+  return values
+    .map((value, index) => {
+      const x = Number((index * step).toFixed(2));
+      const y = Number((50 - (value / max) * 35).toFixed(2));
+      return `${x},${y}`;
+    })
+    .join(" ");
 }
 
 async function fetchJson(url, options) {
@@ -52,30 +47,46 @@ const SectionCard = ({ title, subtitle, children }) => (
   </section>
 );
 
-const TrendChart = ({ title, subtitle, series }) => (
-  <section className="card chart-card">
-    <div className="panel-head">
-      <div>
-        <p className="eyebrow">Report</p>
-        <h2>{title}</h2>
-        {subtitle ? <p className="muted">{subtitle}</p> : null}
-      </div>
-    </div>
-    <div className="chart-list">
-      {series.map((item) => (
-        <div className="chart-row" key={item.label}>
-          <div className="chart-meta">
-            <span>{item.label}</span>
-            <strong>{item.value.toFixed(0)}</strong>
-          </div>
-          <div className="chart-track">
-            <div className="chart-fill" style={{ width: item.width }} />
-          </div>
+const TrendChart = ({ title, subtitle, series, metric }) => {
+  const values = series.map((item) => Number(item[metric] || 0));
+  const points = buildLinePoints(values);
+  const max = Math.max(...values.map((value) => Math.abs(value)), 1);
+
+  return (
+    <section className="card chart-card">
+      <div className="panel-head">
+        <div>
+          <p className="eyebrow">Report</p>
+          <h2>{title}</h2>
+          {subtitle ? <p className="muted">{subtitle}</p> : null}
         </div>
-      ))}
-    </div>
-  </section>
-);
+      </div>
+      <div className="line-chart">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-label={title}>
+          <polyline className="chart-grid-line" points="0,20 100,20" />
+          <polyline className="chart-grid-line" points="0,50 100,50" />
+          <polyline className="chart-grid-line" points="0,80 100,80" />
+          <polyline className={`chart-line ${metric}`} points={points} />
+        </svg>
+      </div>
+      <div className="chart-list">
+        {series.map((item) => (
+          <div className="chart-row" key={item.date}>
+            <div className="chart-meta">
+              <span>{item.label}</span>
+              <strong>{Number(item[metric] || 0).toFixed(0)}</strong>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="chart-legend">
+        <span className={`legend-dot ${metric}`} />
+        <span>{metric === "sales" ? "Sales" : "Profit"}</span>
+        <span className="muted">Max: {max.toFixed(0)}</span>
+      </div>
+    </section>
+  );
+};
 
 export default function App() {
   const [username, setUsername] = useState("admin");
@@ -92,6 +103,7 @@ export default function App() {
   const [productForm, setProductForm] = useState(emptyProductForm);
   const [employeeForm, setEmployeeForm] = useState(emptyEmployeeForm);
   const [expenseForm, setExpenseForm] = useState(emptyExpenseForm);
+  const [reportTrend, setReportTrend] = useState({ daily: [], monthly: [] });
 
   const [editingProductId, setEditingProductId] = useState(null);
   const [editingEmployeeId, setEditingEmployeeId] = useState(null);
@@ -110,6 +122,8 @@ export default function App() {
     setProducts(productData);
     setEmployees(employeeData);
     setExpenses(expenseData);
+    const trendData = await fetchJson(`${API_BASE_URL}/api/reports/trend`);
+    setReportTrend(trendData);
   };
 
   useEffect(() => {
@@ -137,46 +151,6 @@ export default function App() {
     const profit = revenue - salariesPaid - expensesTotal;
     return { productCount, totalStock, totalSold, inventoryValue, revenue, salaryFund, salariesPaid, expensesTotal, profit };
   }, [products, employees, expenses]);
-
-  const reportSeries = useMemo(() => {
-    const dayMap = new Map();
-    const monthMap = new Map();
-    const today = new Date();
-
-    for (let offset = 6; offset >= 0; offset -= 1) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - offset);
-      dayMap.set(formatDayKey(date), 0);
-    }
-
-    for (let offset = 5; offset >= 0; offset -= 1) {
-      const date = new Date(today.getFullYear(), today.getMonth() - offset, 1);
-      monthMap.set(formatMonthKey(date), 0);
-    }
-
-    expenses.forEach((expense) => {
-      const dayKey = formatDayKey(expense.createdAt);
-      const monthKey = formatMonthKey(expense.createdAt);
-      if (dayMap.has(dayKey)) dayMap.set(dayKey, dayMap.get(dayKey) + Number(expense.amount || 0));
-      if (monthMap.has(monthKey)) monthMap.set(monthKey, monthMap.get(monthKey) + Number(expense.amount || 0));
-    });
-
-    employees.forEach((employee) => {
-      if (!employee.lastPaidAt) return;
-      const monthKey = formatMonthKey(employee.lastPaidAt);
-      if (monthMap.has(monthKey)) monthMap.set(monthKey, monthMap.get(monthKey) + Number(employee.totalPaid || employee.salary || 0));
-    });
-
-    const dailyLabels = Array.from(dayMap.keys()).map((key) => key.slice(5).replace("-", "/"));
-    const dailyValues = Array.from(dayMap.values());
-    const monthlyLabels = Array.from(monthMap.keys()).map((key) => key.slice(5).replace("-", "/"));
-    const monthlyValues = Array.from(monthMap.values());
-
-    return {
-      daily: buildSeries(dailyLabels, dailyValues),
-      monthly: buildSeries(monthlyLabels, monthlyValues),
-    };
-  }, [expenses, employees]);
 
   const resetMessages = () => {
     setDashboardError("");
@@ -209,6 +183,36 @@ export default function App() {
     } finally {
       setClearingDemo(false);
     }
+  };
+
+  const buildExportRows = () => {
+    const lines = [
+      ["period", "label", "sales", "profit"].join(","),
+      ...reportTrend.daily.map(
+        (item) =>
+          `daily,${item.label},${Number(item.sales || 0).toFixed(2)},${Number(item.profit || 0).toFixed(2)}`,
+      ),
+      ...reportTrend.monthly.map(
+        (item) =>
+          `monthly,${item.label},${Number(item.sales || 0).toFixed(2)},${Number(item.profit || 0).toFixed(2)}`,
+      ),
+    ];
+
+    return lines.join("\n");
+  };
+
+  const exportReport = () => {
+    const blob = new Blob([buildExportRows()], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "report.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printDashboard = () => {
+    window.print();
   };
 
   const handleLogin = async (event) => {
@@ -594,6 +598,14 @@ export default function App() {
             <h1>{SECTIONS.find((item) => item.id === activeSection)?.label}</h1>
             <p className="lead">Chapdagi menyudan bo'lim tanlang. O'ng tomonda faqat o'sha bo'lim chiqadi.</p>
           </div>
+          <div className="header-actions">
+            <button className="secondary-button" type="button" onClick={exportReport}>
+              Export CSV
+            </button>
+            <button className="secondary-button" type="button" onClick={printDashboard}>
+              Print
+            </button>
+          </div>
         </header>
         {(dashboardError || dashboardMessage) && (
           <section className="notice-row">
@@ -625,14 +637,28 @@ export default function App() {
             </section>
             <section className="chart-grid">
               <TrendChart
-                title="Kunlik xarajatlar"
+                title="Kunlik savdo"
                 subtitle="Oxirgi 7 kun"
-                series={reportSeries.daily}
+                series={reportTrend.daily}
+                metric="sales"
               />
               <TrendChart
-                title="Oylik chiqimlar"
+                title="Kunlik foyda"
+                subtitle="Oxirgi 7 kun"
+                series={reportTrend.daily}
+                metric="profit"
+              />
+              <TrendChart
+                title="Oylik savdo"
                 subtitle="Oxirgi 6 oy"
-                series={reportSeries.monthly}
+                series={reportTrend.monthly}
+                metric="sales"
+              />
+              <TrendChart
+                title="Oylik foyda"
+                subtitle="Oxirgi 6 oy"
+                series={reportTrend.monthly}
+                metric="profit"
               />
             </section>
           </section>
